@@ -5,15 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Keuangan RESPEK</title>
     
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; background-color: #f8fafc; color: #333; }
+        body { margin: 0; font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; }
         @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
-        .container { animation: fadeInUp 0.6s ease-out; max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+        .container { animation: fadeInUp 0.5s ease-out; max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .header-title { color: #b91c1c; font-weight: 800; font-size: 2.5rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: -1px;}
+        .header-subtitle { color: #64748b; font-size: 1rem; margin-top: 0; }
+        .card { background: #ffffff; border-radius: 12px; padding: 25px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid #e2e8f0; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; margin-bottom: 20px;}
+        .card-title { color: #0f172a; margin: 0; font-size: 1.25rem; font-weight: 700; border-left: 4px solid #ef4444; padding-left: 10px;}
+        .summary-container { display: flex; gap: 15px; font-size: 0.875rem; }
+        .summary-item { display: flex; flex-direction: column; }
+        .summary-label { color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600;}
+        .text-green { color: #16a34a; font-weight: 600; }
+        .text-red { color: #dc2626; font-weight: 600; }
+        .text-blue { color: #2563eb; font-weight: 700; }
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+        th { background-color: #f8fafc; color: #475569; font-weight: 600; font-size: 0.875rem; text-transform: uppercase; padding: 12px 15px; text-align: left; border-bottom: 2px solid #e2e8f0;}
+        td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; }
+        tbody tr:hover { background-color: #f8fafc; transition: all 0.2s; }
+        .badge { padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+        .badge-masuk { background-color: #dcfce7; color: #16a34a; }
+        .badge-keluar { background-color: #fee2e2; color: #dc2626; }
+        .alert-error { background-color: #fee2e2; color: #991b1b; padding: 20px; border-radius: 10px; border: 1px solid #f87171; text-align: center; margin-bottom: 20px; }
+        .alert-empty { background-color: #ffffff; color: #64748b; padding: 40px; border-radius: 10px; border: 1px dashed #cbd5e1; text-align: center; }
     </style>
 </head>
 <body>
@@ -27,6 +50,7 @@
         function App() {
             const [transactions, setTransactions] = React.useState([]);
             const [loading, setLoading] = React.useState(true);
+            const [errorMsg, setErrorMsg] = React.useState(null);
 
             React.useEffect(() => {
                 fetchData();
@@ -34,15 +58,35 @@
 
             const fetchData = async () => {
                 setLoading(true);
-                const { data } = await supabaseClient
-                    .from('transaksi')
-                    .select('*')
-                    .order('tanggal', { ascending: false });
-                setTransactions(data || []);
-                setLoading(false);
+                setErrorMsg(null);
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('transaksi')
+                        .select('*')
+                        .order('tanggal', { ascending: false });
+                    
+                    // Menangkap error dari Supabase (misalnya karena RLS)
+                    if (error) {
+                        throw new Error(error.message);
+                    }
+                    
+                    setTransactions(data || []);
+                } catch (err) {
+                    console.error("Gagal mengambil data:", err);
+                    setErrorMsg(err.message);
+                } finally {
+                    setLoading(false);
+                }
             };
 
-            // Mengelompokkan data berdasarkan Nama Acara
+            const formatRupiah = (angka) => {
+                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+            };
+
+            const formatTanggal = (tanggal) => {
+                return new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+            };
+
             const laporanPerAcara = transactions.reduce((acc, curr) => {
                 const acara = curr.acara || "Umum/Kas Rutin";
                 if (!acc[acara]) acc[acara] = [];
@@ -52,39 +96,89 @@
 
             return (
                 <div className="container">
-                    <div style={{textAlign: 'center', borderBottom: '3px solid #cc0000', paddingBottom: '20px', marginBottom: '30px'}}>
-                        <h1 style={{color: '#cc0000', margin: '0'}}>LAPORAN KEUANGAN RESPEK</h1>
-                        <p style={{fontStyle: 'italic', color: '#555'}}>Update data langsung melalui database Supabase</p>
+                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                        <h1 className="header-title">Laporan Keuangan RESPEK</h1>
+                        <p className="header-subtitle">Transparansi Dana Terkini</p>
                     </div>
 
-                    {loading ? <p>Memuat data...</p> : Object.keys(laporanPerAcara).map(acara => (
-                        <div key={acara} style={{backgroundColor: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', marginBottom: '30px'}}>
-                            <h2 style={{color: '#cc0000', marginTop: '0', borderLeft: '5px solid #cc0000', paddingLeft: '15px'}}>{acara}</h2>
-                            <table style={{width: '100%', borderCollapse: 'collapse'}}>
-                                <thead>
-                                    <tr style={{backgroundColor: '#f1f5f9'}}>
-                                        <th style={{padding: '12px', textAlign: 'left'}}>Tanggal</th>
-                                        <th style={{padding: '12px', textAlign: 'left'}}>Rincian</th>
-                                        <th style={{padding: '12px', textAlign: 'left'}}>Nominal</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {laporanPerAcara[acara].map(t => (
-                                        <tr key={t.id} style={{borderBottom: '1px solid #e2e8f0'}}>
-                                            <td style={{padding: '12px'}}>{t.tanggal}</td>
-                                            <td style={{padding: '12px'}}>{t.penggunaan}</td>
-                                            <td style={{padding: '12px', fontWeight: 'bold', color: t.tipe === 'masuk' ? '#16a34a' : '#dc2626'}}>
-                                                {t.tipe === 'masuk' ? '+' : '-'} Rp {Number(t.nominal).toLocaleString('id-ID')}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                    {loading ? (
+                        <div style={{textAlign: 'center', padding: '50px', color: '#64748b'}}>
+                            <h2>Mencari data keuangan...</h2>
                         </div>
-                    ))}
+                    ) : errorMsg ? (
+                        <div className="alert-error">
+                            <h3>Akses Data Gagal</h3>
+                            <p><strong>Pesan Error:</strong> {errorMsg}</p>
+                            <p style={{fontSize: '0.9rem', marginTop: '10px'}}>
+                                Pastikan <strong>Row Level Security (RLS)</strong> di tabel 'transaksi' Supabase Anda sudah diatur agar publik bisa membaca data (SELECT). Jika Anda membukanya lewat file HP, coba jalankan melalui jaringan internet lokal / Web Hosting.
+                            </p>
+                        </div>
+                    ) : transactions.length === 0 ? (
+                        <div className="alert-empty">
+                            <h3>Belum Ada Data Transaksi</h3>
+                            <p>Tabel 'transaksi' Anda saat ini masih kosong.</p>
+                        </div>
+                    ) : Object.keys(laporanPerAcara).map(acara => {
+                        const dataAcara = laporanPerAcara[acara];
+                        const totalMasuk = dataAcara.filter(t => t.tipe === 'masuk').reduce((sum, t) => sum + Number(t.nominal), 0);
+                        const totalKeluar = dataAcara.filter(t => t.tipe === 'keluar').reduce((sum, t) => sum + Number(t.nominal), 0);
+                        const saldoAkhir = totalMasuk - totalKeluar;
+
+                        return (
+                            <div key={acara} className="card">
+                                <div className="card-header">
+                                    <h2 className="card-title">{acara}</h2>
+                                    <div className="summary-container">
+                                        <div className="summary-item">
+                                            <span className="summary-label">Masuk</span>
+                                            <span className="text-green">{formatRupiah(totalMasuk)}</span>
+                                        </div>
+                                        <div className="summary-item">
+                                            <span className="summary-label">Keluar</span>
+                                            <span className="text-red">{formatRupiah(totalKeluar)}</span>
+                                        </div>
+                                        <div className="summary-item" style={{borderLeft: '1px solid #e2e8f0', paddingLeft: '15px'}}>
+                                            <span className="summary-label">Saldo Saat Ini</span>
+                                            <span className="text-blue">{formatRupiah(saldoAkhir)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Tanggal</th>
+                                                <th>Keterangan</th>
+                                                <th>Status</th>
+                                                <th style={{textAlign: 'right'}}>Nominal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {dataAcara.map(t => (
+                                                <tr key={t.id}>
+                                                    <td style={{color: '#64748b'}}>{formatTanggal(t.tanggal)}</td>
+                                                    <td>{t.penggunaan}</td>
+                                                    <td>
+                                                        <span className={`badge ${t.tipe === 'masuk' ? 'badge-masuk' : 'badge-keluar'}`}>
+                                                            {t.tipe === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{textAlign: 'right'}} className={t.tipe === 'masuk' ? 'text-green' : 'text-red'}>
+                                                        {t.tipe === 'masuk' ? '+' : '-'} {formatRupiah(t.nominal)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             );
         }
+        
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
